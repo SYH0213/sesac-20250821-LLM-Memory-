@@ -1,12 +1,14 @@
 import gradio as gr
 from operator import itemgetter
-from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough, Runnable
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 import os
 from dotenv import load_dotenv
+
+from langchain.memory import ConversationBufferMemory, ConversationBufferWindowMemory, ConversationTokenBufferMemory, ConversationEntityMemory, ConversationSummaryMemory
+
 
 # 환경 변수 로드
 load_dotenv()
@@ -37,7 +39,7 @@ class MyConversationChain(Runnable):
 
 
 class GradioChatApp:
-    def __init__(self, model_name="gpt-4o-mini", temperature=0.7):
+    def __init__(self, model_name="gpt-4o-mini", temperature=0.2):
         self.model_name = model_name
         self.temperature = temperature
         self.conversation_chain = None
@@ -56,12 +58,19 @@ class GradioChatApp:
             ]
         )
         
-        # 대화 버퍼 메모리 생성
+        # 가장 단순한 메모리 저장 방식. 대화를 계속 축적해 나가기 때문에 길어지면 토큰에 부담이 가게됨.
         memory = ConversationBufferMemory(return_messages=True, memory_key="chat_history")
-        #
-        #
-        #
-        
+        # 가장 최근의 k개의 메세지만 저장. 최근의 대화의 맥락을 파악하기 좋지만, 채팅이 길어지면 이전의 내용은 삭제되어 모델이 기억하지 못하게 됨.
+        #memory = ConversationBufferWindowMemory(k=3, return_messages=True, memory_key="chat_history")
+        # 토큰을 기준으로 메세지를 저장함. 토큰을 기준으로 하기때문에 비용을 절감하는데 좋음. 하지만 저장하는 메세지의 개수를 지정하는 것이 아니기 때문에
+        # 여러개의 대화가 저장되는 경우도 있지만 하나의 대화의 길이가 긴 경우 1~2개만 저장될 가능성 있음.
+        #memory = ConversationTokenBufferMemory(llm=llm, max_token_limit=400, return_messages=True, memory_key="chat_history")
+        # 전체 대화내용을 요약본으로 압축하여 저장함. 장기 대화를 하는 경우 대화의 맥락을 이해하기 때문에 유리함.
+        # 대화내용이 너무 길어지는경우 디테일의 손실이 일어날 수 있으며, 매번 대화 후 요약을 업데이트하기 때문에 토큰 사용량이 늘고 속도가 느려질 수 있음.
+        #memory = ConversationSummaryMemory(llm=llm, return_messages=True, memory_key="chat_history")
+        # 대화 중 등장하는 인물, 장소, 사물 중심으로 기억함.
+        #memory = ConversationEntityMemory(llm=llm, return_messages=True, memory_key="chat_history")
+
         
         # 대화 체인 생성
         self.conversation_chain = MyConversationChain(llm, prompt, memory)
@@ -199,8 +208,7 @@ if __name__ == "__main__":
     # Gradio 인터페이스 실행
     demo = create_gradio_interface()
     demo.launch(
-        share=False,  # True로 설정하면 공개 URL 생성
-        server_name="0.0.0.0",  # 모든 네트워크 인터페이스에서 접근 가능
+        share=True,  # True로 설정하면 공개 URL 생성
         server_port=7860,  # 포트 설정
         show_error=True
     )

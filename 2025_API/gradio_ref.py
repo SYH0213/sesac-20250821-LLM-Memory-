@@ -4,6 +4,10 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough, Runnable
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
+from dotenv import load_dotenv
+
+# API KEY 정보로드
+load_dotenv()
 
 # ChatOpenAI 모델을 초기화합니다.
 llm = ChatOpenAI(model_name="gpt-4.1-mini", temperature=0)
